@@ -1,8 +1,10 @@
 import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import cors from "cors";
 
 // ─── Route Imports ────────────────────────────────────────────────────────────
+import authRoutes from "./routes/auth.routes.js";
 import mandalRoutes from "./routes/mandal.routes.js";
 import bookingRoutes from "./routes/booking.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -15,6 +17,12 @@ const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/ganesh-mandal-db";
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
+app.use(cors({
+    origin: ['http://localhost:8081', 'http://localhost:19006'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -27,6 +35,7 @@ app.get("/", (req, res) => {
 });
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
+app.use("/api/auth", authRoutes);
 app.use("/api/mandals", mandalRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/users", userRoutes);

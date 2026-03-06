@@ -4,8 +4,12 @@ import {
     searchMandals,
     getMandalDetails,
 } from "../controllers/mandal.controller.js";
+import { verifyToken } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
+
+// All mandal routes require a logged-in user
+router.use(verifyToken);
 
 // POST   /api/mandals              → Create a new Mandal
 router.post("/", createMandal);

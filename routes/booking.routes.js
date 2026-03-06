@@ -6,8 +6,12 @@ import {
     updateBookingPrice,
     closeBooking,
 } from "../controllers/booking.controller.js";
+import { verifyToken } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
+
+// All booking routes require a logged-in user
+router.use(verifyToken);
 
 // POST   /api/bookings                          → Create a new booking
 router.post("/", createBooking);
