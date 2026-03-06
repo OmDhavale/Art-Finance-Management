@@ -1,5 +1,6 @@
 import Mandal from "../models/mandal.model.js";
 import Booking from "../models/booking.model.js";
+import { calculateGrade } from "./booking.controller.js";
 
 // ─── Create Mandal ────────────────────────────────────────────────────────────
 
@@ -100,10 +101,12 @@ export const getMandalDetails = async (req, res) => {
             });
         }
 
-        // Fetch all bookings for this mandal, newest year first
+        // Fetch ALL bookings for this mandal across all workshops (read-only history),
+        // newest year first
         const bookings = await Booking.find({ mandalId })
             .sort({ year: -1 })
             .populate("vendorId", "name workshopName phone");
+
 
         return res.status(200).json({
             success: true,
@@ -142,11 +145,12 @@ export const getAllMandals = async (req, res) => {
 
         const mandalIds = mandals.map((m) => m._id);
 
-        // Fetch all bookings for these mandals in one query
+        // Fetch ALL bookings for these mandals across all workshops (read-only history)
         const allBookings = await Booking.find({ mandalId: { $in: mandalIds } })
             .sort({ year: -1 })
             .populate("vendorId", "name workshopName")
             .lean();
+
 
         // Build a map: mandalId → bookings[]
         const bookingsByMandal = {};
@@ -164,7 +168,7 @@ export const getAllMandals = async (req, res) => {
             const latest = bookings[0] || null;
 
             const totalPending = bookings.reduce(
-                (sum, b) => sum + (b.remainingAmount || 0),
+                (sum, b) => sum + Math.max(0, b.remainingAmount || 0),
                 0
             );
 
@@ -172,7 +176,7 @@ export const getAllMandals = async (req, res) => {
                 year: b.year,
                 vendorName: b.vendorId?.name || "Unknown",
                 workshopName: b.vendorId?.workshopName || "",
-                grade: b.grade,
+                grade: calculateGrade(b.remainingAmount || 0),
                 remainingAmount: b.remainingAmount || 0,
                 finalPrice: b.finalPrice || 0,
                 totalPaid: b.totalPaid || 0,
@@ -180,7 +184,7 @@ export const getAllMandals = async (req, res) => {
 
             return {
                 ...m,
-                latestGrade: latest?.grade || null,
+                latestGrade: latest ? calculateGrade(latest.remainingAmount || 0) : null,
                 latestYear: latest?.year || null,
                 totalPending,
                 bookingSummary,

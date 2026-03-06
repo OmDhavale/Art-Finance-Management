@@ -6,6 +6,7 @@ import {
     addPayment,
     updateBookingPrice,
     closeBooking,
+    deleteBooking,
 } from "../controllers/booking.controller.js";
 import { verifyToken } from "../middleware/auth.middleware.js";
 
@@ -32,5 +33,8 @@ router.patch("/:bookingId/price", updateBookingPrice);
 
 // PATCH  /api/bookings/:bookingId/close         → Close the booking
 router.patch("/:bookingId/close", closeBooking);
+
+// DELETE /api/bookings/:bookingId               → Delete a booking (owner only)
+router.delete("/:bookingId", deleteBooking);
 
 export default router;

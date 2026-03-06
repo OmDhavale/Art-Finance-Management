@@ -127,19 +127,47 @@ const bookingSchema = new Schema(
         grade: {
             type: String,
             enum: {
-                values: ["green", "yellow", "orange", "red"],
-                message: "Grade must be one of: green, yellow, orange, red",
+                values: ["excellent", "green", "yellow", "orange", "red"],
+                message: "Grade must be one of: excellent, green, yellow, orange, red",
             },
         },
+        /** When true, no further price edits are permitted (set after full payment). */
+        isPriceLocked: {
+            type: Boolean,
+            default: false,
+        },
+        /** Audit trail of every finalPrice change. */
+        priceHistory: [
+            {
+                oldPrice: Number,
+                newPrice: Number,
+                changedBy: {
+                    type: Schema.Types.ObjectId,
+                    ref: "User",
+                },
+                reason: String,
+                changedAt: {
+                    type: Date,
+                    default: Date.now,
+                },
+            },
+        ],
         /** Embedded array of all payment transactions for this booking. */
         payments: {
             type: [paymentSchema],
             default: [],
         },
+        /** Tracks who actually created this booking (could be owner or manager). */
+        createdBy: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            default: null,
+        },
         createdAt: {
             type: Date,
             default: Date.now,
         },
+
     },
     {
         collection: "bookings",

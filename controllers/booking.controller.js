@@ -4,20 +4,23 @@ import mongoose from "mongoose";
 // ─── Helper: Calculate Grade ──────────────────────────────────────────────────
 
 /**
- * calculateGrade(remainingAmount) → "green" | "yellow" | "orange" | "red"
+ * calculateGrade(remainingAmount) → "excellent" | "green" | "yellow" | "orange" | "red"
  *
  * Grade logic:
- *   remainingAmount === 0        → green  (fully paid)
- *   remainingAmount < 10,000    → yellow (almost done)
- *   remainingAmount < 50,000    → orange (partially paid)
- *   remainingAmount >= 50,000   → red    (largely unpaid)
+ *   remainingAmount < 0         → excellent (overpaid — mandal gave extra)
+ *   remainingAmount === 0       → green     (fully paid)
+ *   remainingAmount < 10,000   → yellow    (almost done)
+ *   remainingAmount < 50,000   → orange    (partially paid)
+ *   remainingAmount >= 50,000  → red       (largely unpaid)
  */
 export const calculateGrade = (remainingAmount) => {
+    if (remainingAmount < 0) return "excellent";
     if (remainingAmount === 0) return "green";
     if (remainingAmount < 10000) return "yellow";
     if (remainingAmount < 50000) return "orange";
     return "red";
 };
+
 
 // ─── Create Booking ───────────────────────────────────────────────────────────
 
@@ -36,13 +39,21 @@ export const createBooking = async (req, res) => {
     try {
         const {
             mandalId,
-            vendorId,
             year,
             murtiSize,
             originalPrice,
             finalPrice,
             advancePaid = 0,
         } = req.body;
+
+        // Consolidate data under the workshop owner
+        // If current user is a manager, the actual vendor is their owner
+        const vendorId = req.user.role === 'manager' ? req.user.ownerId : req.user._id;
+
+        if (!vendorId) {
+            return res.status(400).json({ success: false, message: "Could not determine workshop owner." });
+        }
+
 
         // Pre-check for duplicate booking (provides a better error message than the index)
         const existing = await Booking.findOne({ mandalId, year });
@@ -71,6 +82,7 @@ export const createBooking = async (req, res) => {
         const booking = await Booking.create({
             mandalId,
             vendorId,
+            createdBy: req.user._id,   // tracks the actual person (owner or manager) who created it
             year,
             murtiSize,
             originalPrice,
@@ -81,6 +93,7 @@ export const createBooking = async (req, res) => {
             grade,
             payments,
         });
+
 
         return res.status(201).json({
             success: true,
@@ -182,9 +195,10 @@ export const addPayment = async (req, res) => {
             amount,
             paymentMode,
             paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
-            addedBy,
+            addedBy: req.user?._id,   // track who added this payment
             createdAt: new Date(),
         });
+
 
         // Recalculate totalPaid as the sum of all embedded payments
         booking.totalPaid = booking.payments.reduce(
@@ -195,6 +209,12 @@ export const addPayment = async (req, res) => {
         // Recalculate remainingAmount and grade
         booking.remainingAmount = (booking.finalPrice || 0) - booking.totalPaid;
         booking.grade = calculateGrade(booking.remainingAmount);
+
+        // Auto-complete and lock price when fully paid (remainingAmount <= 0)
+        if (booking.remainingAmount <= 0) {
+            booking.status = "completed";
+            booking.isPriceLocked = true;
+        }
 
         await booking.save();
 
@@ -230,8 +250,18 @@ export const addPayment = async (req, res) => {
  */
 export const updateBookingPrice = async (req, res) => {
     try {
+        // ── Role guard: only owners may edit price ─────────────────────────────
+        if (req.user?.role === 'manager') {
+            return res.status(403).json({
+                success: false,
+                message: "Managers cannot edit the final price. Please contact the workshop owner.",
+            });
+        }
+
         const { bookingId } = req.params;
-        const { finalPrice } = req.body;
+
+        const { finalPrice, reason } = req.body;
+        const changedBy = req.user?._id;
 
         if (finalPrice === undefined || finalPrice < 0) {
             return res.status(400).json({
@@ -248,9 +278,51 @@ export const updateBookingPrice = async (req, res) => {
             });
         }
 
+        // ── Guard 1: Price is locked (full payment already made) ──────────────
+        if (booking.isPriceLocked) {
+            return res.status(403).json({
+                success: false,
+                message: "Price cannot be edited after full payment.",
+            });
+        }
+
+        const currentPrice = booking.finalPrice || 0;
+
+        // ── Guard 2: Price increase is never allowed ───────────────────────────
+        if (finalPrice > currentPrice) {
+            return res.status(400).json({
+                success: false,
+                message: "Price increase is not allowed after booking.",
+            });
+        }
+
+        // ── Guard 3: No price increase after any payment exists ───────────────
+        if ((booking.totalPaid || 0) > 0 && finalPrice > currentPrice) {
+            return res.status(400).json({
+                success: false,
+                message: "Price increase is not allowed after payments are made.",
+            });
+        }
+
+        // ── Record audit trail ────────────────────────────────────────────────
+        booking.priceHistory.push({
+            oldPrice: currentPrice,
+            newPrice: finalPrice,
+            changedBy,
+            reason: reason || "Negotiation",
+            changedAt: new Date(),
+        });
+
+        // ── Apply price change ────────────────────────────────────────────────
         booking.finalPrice = finalPrice;
         booking.remainingAmount = finalPrice - (booking.totalPaid || 0);
         booking.grade = calculateGrade(booking.remainingAmount);
+
+        // ── Auto-lock if remaining is now 0 or less ───────────────────────────
+        if (booking.remainingAmount <= 0) {
+            booking.isPriceLocked = true;
+            booking.status = "completed";
+        }
 
         await booking.save();
 
@@ -278,7 +350,16 @@ export const updateBookingPrice = async (req, res) => {
  */
 export const closeBooking = async (req, res) => {
     try {
+        // ── Role guard: only owners may close a booking ────────────────────────
+        if (req.user?.role === 'manager') {
+            return res.status(403).json({
+                success: false,
+                message: "Managers cannot close bookings. Please contact the workshop owner.",
+            });
+        }
+
         const { bookingId } = req.params;
+
 
         const booking = await Booking.findById(bookingId);
         if (!booking) {
@@ -314,14 +395,20 @@ export const closeBooking = async (req, res) => {
  */
 export const getMyBookings = async (req, res) => {
     try {
-        const vendorId = req.user?.id;
+        // Determine the workshop owner ID
+        const vendorId = req.user.role === 'owner' ? req.user._id : req.user.ownerId;
+
         if (!vendorId) {
-            return res.status(401).json({ success: false, message: "Unauthorized." });
+            return res.status(401).json({ success: false, message: "Unauthorized. Workshop owner not found." });
         }
+
 
         const bookings = await Booking.find({ vendorId })
             .populate("mandalId", "ganpatiTitle mandalName area city")
+            .populate("vendorId", "name workshopName")          // for workshop name display
+            .populate("createdBy", "name role")                 // for "Booked by" attribution
             .sort({ year: -1, createdAt: -1 });
+
 
         return res.status(200).json({
             success: true,
@@ -332,5 +419,45 @@ export const getMyBookings = async (req, res) => {
             success: false,
             message: error.message || "Internal server error",
         });
+    }
+};
+
+// ─── Delete Booking ────────────────────────────────────────────────────────────
+
+/**
+ * DELETE /api/bookings/:bookingId
+ * Deletes a booking. Only the vendor who created it can delete it.
+ */
+export const deleteBooking = async (req, res) => {
+    try {
+        // ── Role guard: only owners may delete a booking ───────────────────────
+        if (req.user?.role === 'manager') {
+            return res.status(403).json({
+                success: false,
+                message: "Managers cannot delete bookings. Please contact the workshop owner.",
+            });
+        }
+
+        const { bookingId } = req.params;
+        const ownerId = (req.user.role === 'owner' ? req.user._id : req.user.ownerId).toString();
+
+
+
+        const booking = await Booking.findById(bookingId);
+        if (!booking) {
+            return res.status(404).json({ success: false, message: "Booking not found." });
+        }
+
+        // Only the workshop (owner and their managers) may delete it
+        if (booking.vendorId.toString() !== ownerId) {
+            return res.status(403).json({ success: false, message: "You can only delete bookings belonging to your workshop." });
+        }
+
+
+        await booking.deleteOne();
+
+        return res.status(200).json({ success: true, message: "Booking deleted successfully." });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message || "Internal server error" });
     }
 };
