@@ -2,6 +2,7 @@ import express from "express";
 import {
     createBooking,
     getBooking,
+    getMyBookings,
     addPayment,
     updateBookingPrice,
     closeBooking,
@@ -15,6 +16,10 @@ router.use(verifyToken);
 
 // POST   /api/bookings                          → Create a new booking
 router.post("/", createBooking);
+
+// GET    /api/bookings/my                       → Get current vendor's bookings
+// NOTE: declared before /:bookingId to avoid route conflict
+router.get("/my", getMyBookings);
 
 // GET    /api/bookings/:bookingId               → Get booking + payment history
 router.get("/:bookingId", getBooking);

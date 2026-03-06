@@ -1,4 +1,5 @@
 import Booking from "../models/booking.model.js";
+import mongoose from "mongoose";
 
 // ─── Helper: Calculate Grade ──────────────────────────────────────────────────
 
@@ -295,6 +296,36 @@ export const closeBooking = async (req, res) => {
             success: true,
             message: `Booking closed with status: ${booking.status}`,
             data: booking,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Internal server error",
+        });
+    }
+};
+
+// ─── Get My Bookings (Vendor) ──────────────────────────────────────────────────────────
+
+/**
+ * GET /api/bookings/my
+ * Returns all bookings for the authenticated vendor (req.user.id),
+ * sorted by year descending, with mandal info populated.
+ */
+export const getMyBookings = async (req, res) => {
+    try {
+        const vendorId = req.user?.id;
+        if (!vendorId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
+
+        const bookings = await Booking.find({ vendorId })
+            .populate("mandalId", "ganpatiTitle mandalName area city")
+            .sort({ year: -1, createdAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            data: bookings,
         });
     } catch (error) {
         return res.status(500).json({

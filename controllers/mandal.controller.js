@@ -119,3 +119,83 @@ export const getMandalDetails = async (req, res) => {
         });
     }
 };
+
+// ─── Get All Mandals (with grades & pending amounts) ─────────────────────────
+
+/**
+ * GET /api/mandals
+ *
+ * Returns every Mandal with:
+ *   - latestGrade   : grade of the most-recent booking (by year)
+ *   - totalPending  : sum of remainingAmount across ALL bookings for this mandal
+ *   - bookingSummary: array of { year, vendorName, workshopName, grade, remainingAmount }
+ *
+ * Sorted alphabetically by ganpatiTitle.
+ */
+export const getAllMandals = async (req, res) => {
+    try {
+        const mandals = await Mandal.find().sort({ ganpatiTitle: 1 }).lean();
+
+        if (mandals.length === 0) {
+            return res.status(200).json({ success: true, count: 0, data: [] });
+        }
+
+        const mandalIds = mandals.map((m) => m._id);
+
+        // Fetch all bookings for these mandals in one query
+        const allBookings = await Booking.find({ mandalId: { $in: mandalIds } })
+            .sort({ year: -1 })
+            .populate("vendorId", "name workshopName")
+            .lean();
+
+        // Build a map: mandalId → bookings[]
+        const bookingsByMandal = {};
+        for (const b of allBookings) {
+            const key = b.mandalId.toString();
+            if (!bookingsByMandal[key]) bookingsByMandal[key] = [];
+            bookingsByMandal[key].push(b);
+        }
+
+        // Enrich each mandal
+        const enriched = mandals.map((m) => {
+            const bookings = bookingsByMandal[m._id.toString()] || [];
+
+            // Latest booking (already sorted by year desc)
+            const latest = bookings[0] || null;
+
+            const totalPending = bookings.reduce(
+                (sum, b) => sum + (b.remainingAmount || 0),
+                0
+            );
+
+            const bookingSummary = bookings.map((b) => ({
+                year: b.year,
+                vendorName: b.vendorId?.name || "Unknown",
+                workshopName: b.vendorId?.workshopName || "",
+                grade: b.grade,
+                remainingAmount: b.remainingAmount || 0,
+                finalPrice: b.finalPrice || 0,
+                totalPaid: b.totalPaid || 0,
+            }));
+
+            return {
+                ...m,
+                latestGrade: latest?.grade || null,
+                latestYear: latest?.year || null,
+                totalPending,
+                bookingSummary,
+            };
+        });
+
+        return res.status(200).json({
+            success: true,
+            count: enriched.length,
+            data: enriched,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Internal server error",
+        });
+    }
+};
