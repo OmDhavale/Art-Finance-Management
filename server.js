@@ -18,7 +18,7 @@ const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/ganesh-man
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors({
-    origin: ['http://localhost:8081', 'http://localhost:19006'],
+    origin: "*",
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
