@@ -19,16 +19,10 @@ const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/ganesh-man
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors({
     //origin: ['http://localhost:8081', 'http://localhost:19006', 'https://artfinancemanagementfe.netlify.app'],
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            return callback(new Error('CORS not allowed'), false);
-        }
-        return callback(null, true);
-    },
+    origin: "*",
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
+    credentials: false,
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
