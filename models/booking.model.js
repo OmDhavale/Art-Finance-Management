@@ -50,6 +50,11 @@ const paymentSchema = new Schema(
             type: Schema.Types.ObjectId,
             ref: "User",
         },
+        /** Whether this payment was the initial booking advance. */
+        isAdvance: {
+            type: Boolean,
+            default: false,
+        },
         createdAt: {
             type: Date,
             default: Date.now,

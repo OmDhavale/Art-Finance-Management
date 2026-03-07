@@ -2,6 +2,30 @@ import Mandal from "../models/mandal.model.js";
 import Booking from "../models/booking.model.js";
 import { calculateGrade } from "./booking.controller.js";
 
+// ─── Helper: Calculate Overall Mandal Grade ───────────────────────────────────
+
+/**
+ * calculateOverallGrade(netPending) → "O" | "A" | "B" | "C" | "D" | null
+ *
+ * Grade is based on the SUM of remainingAmount across ALL bookings for a mandal
+ * (this sum can be negative if the mandal has ever over-paid).
+ *
+ *   netPending < 0          → "O"  (Outstanding — overpaid the murtikar)
+ *   netPending === 0        → "A"  (Excellent — all bookings fully cleared)
+ *   netPending < 5,000      → "B"  (Good payer)
+ *   netPending < 50,000     → "C"  (Average payer)
+ *   netPending >= 50,000    → "D"  (Poor payer — large dues)
+ *
+ * Returns null when the mandal has no bookings at all.
+ */
+export const calculateOverallGrade = (netPending) => {
+    if (netPending < 0) return "O";
+    if (netPending === 0) return "A";
+    if (netPending < 5000) return "B";
+    if (netPending < 50000) return "C";
+    return "D";
+};
+
 // ─── Create Mandal ────────────────────────────────────────────────────────────
 
 /**
@@ -67,12 +91,36 @@ export const searchMandals = async (req, res) => {
                 { mandalName: regex },
                 { area: regex },
             ],
-        });
+        }).lean();
+
+        // Enrich each result with overallGrade from booking history
+        let enriched = mandals;
+        if (mandals.length > 0) {
+            const mandalIds = mandals.map((m) => m._id);
+            const allBookings = await Booking.find({ mandalId: { $in: mandalIds } }).lean();
+
+            // Map mandalId → summed remainingAmount
+            const pendingMap = {};
+            const hasBookingMap = {};
+            for (const b of allBookings) {
+                const key = b.mandalId.toString();
+                pendingMap[key] = (pendingMap[key] || 0) + (b.remainingAmount || 0);
+                hasBookingMap[key] = true;
+            }
+
+            enriched = mandals.map((m) => {
+                const key = m._id.toString();
+                const overallGrade = hasBookingMap[key]
+                    ? calculateOverallGrade(pendingMap[key] || 0)
+                    : null;
+                return { ...m, overallGrade };
+            });
+        }
 
         return res.status(200).json({
             success: true,
-            count: mandals.length,
-            data: mandals,
+            count: enriched.length,
+            data: enriched,
         });
     } catch (error) {
         return res.status(500).json({
@@ -108,10 +156,19 @@ export const getMandalDetails = async (req, res) => {
             .populate("vendorId", "name workshopName phone");
 
 
+        // Compute the mandal's overall grade from its full booking history
+        const netPending = bookings.reduce(
+            (sum, b) => sum + (b.remainingAmount || 0),
+            0
+        );
+        const overallGrade = bookings.length > 0
+            ? calculateOverallGrade(netPending)
+            : null;
+
         return res.status(200).json({
             success: true,
             data: {
-                mandal,
+                mandal: { ...mandal.toObject(), overallGrade },
                 bookingHistory: bookings,
             },
         });
@@ -182,11 +239,21 @@ export const getAllMandals = async (req, res) => {
                 totalPaid: b.totalPaid || 0,
             }));
 
+            // Net pending = raw sum (can be negative for overpaid mandals)
+            const netPending = bookings.reduce(
+                (sum, b) => sum + (b.remainingAmount || 0),
+                0
+            );
+            const overallGrade = bookings.length > 0
+                ? calculateOverallGrade(netPending)
+                : null;
+
             return {
                 ...m,
                 latestGrade: latest ? calculateGrade(latest.remainingAmount || 0) : null,
                 latestYear: latest?.year || null,
                 totalPending,
+                overallGrade,
                 bookingSummary,
             };
         });

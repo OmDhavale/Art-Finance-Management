@@ -75,6 +75,8 @@ export const createBooking = async (req, res) => {
                 amount: advancePaid,
                 paymentMode: "cash",          // default mode for advance; can be updated later
                 paymentDate: new Date(),
+                addedBy: req.user?._id,       // track who created the booking and advance payment
+                isAdvance: true,              // mark as initial advance
                 createdAt: new Date(),
             });
         }
@@ -134,7 +136,8 @@ export const getBooking = async (req, res) => {
 
         const booking = await Booking.findById(bookingId)
             .populate("mandalId", "ganpatiTitle mandalName area city")
-            .populate("vendorId", "name workshopName phone");
+            .populate("vendorId", "name workshopName phone")
+            .populate("payments.addedBy", "name role");
 
         if (!booking) {
             return res.status(404).json({
