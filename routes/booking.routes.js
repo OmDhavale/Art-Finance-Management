@@ -6,6 +6,7 @@ import {
     addPayment,
     updateBookingPrice,
     closeBooking,
+    getDashboardStats,
     deleteBooking,
 } from "../controllers/booking.controller.js";
 import { verifyToken } from "../middleware/auth.middleware.js";
@@ -21,6 +22,9 @@ router.post("/", createBooking);
 // GET    /api/bookings/my                       → Get current vendor's bookings
 // NOTE: declared before /:bookingId to avoid route conflict
 router.get("/my", getMyBookings);
+
+// GET    /api/bookings/stats                    → Dashboard statistics
+router.get("/stats", getDashboardStats);
 
 // GET    /api/bookings/:bookingId               → Get booking + payment history
 router.get("/:bookingId", getBooking);

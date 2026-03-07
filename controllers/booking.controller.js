@@ -431,6 +431,97 @@ export const getMyBookings = async (req, res) => {
  * DELETE /api/bookings/:bookingId
  * Deletes a booking. Only the vendor who created it can delete it.
  */
+// ─── Get Dashboard Stats ───────────────────────────────────────────────────────
+/**
+ * GET /api/bookings/stats
+ * Aggregates dashboard data for the workshop:
+ * - Active Mandals (unique mandals booked this year)
+ * - Total Pending (sum of remainingAmount for workshop)
+ * - Due Mandals (count of bookings with remaining > 0)
+ * - Recent Activity (combined list of recent payments & recent bookings)
+ */
+export const getDashboardStats = async (req, res) => {
+    try {
+        const vendorId = req.user.role === 'owner' ? req.user._id : req.user.ownerId;
+        if (!vendorId) {
+            return res.status(401).json({ success: false, message: "Workshop owner not found." });
+        }
+
+        const currentYear = new Date().getFullYear();
+
+        // 1. Fetch all bookings for this workshop (sorted for activity)
+        const bookings = await Booking.find({ vendorId })
+            .populate("mandalId", "ganpatiTitle mandalName area city")
+            .sort({ createdAt: -1 });
+
+        // Calculate stats
+        const activeMandalIds = new Set();
+        let pendingAmount = 0;
+        let dueMandalsCount = 0;
+
+        bookings.forEach(b => {
+            if (b.year === currentYear) {
+                activeMandalIds.add(b.mandalId._id.toString());
+            }
+            if (b.remainingAmount > 0) {
+                pendingAmount += b.remainingAmount;
+                dueMandalsCount++;
+            }
+        });
+
+        // 2. Aggregate Activity
+        // We'll combine:
+        // - Bookings (type: 'booking')
+        // - Payments (type: 'payment')
+
+        const activityList = [];
+
+        // Add bookings to activity list
+        bookings.forEach(b => {
+            activityList.push({
+                _id: b._id,
+                type: 'booking',
+                title: b.mandalId?.ganpatiTitle || "New Mandal",
+                subtitle: `New murti booking created`,
+                amount: b.finalPrice,
+                date: b.createdAt,
+                mandalId: b.mandalId?._id
+            });
+
+            // Add payments from this booking
+            (b.payments || []).forEach(p => {
+                activityList.push({
+                    _id: p._id,
+                    type: 'payment',
+                    title: b.mandalId?.ganpatiTitle || "Mandal",
+                    subtitle: p.isAdvance ? "Advance payment received" : "Payment received",
+                    amount: p.amount,
+                    date: p.createdAt,
+                    mandalId: b.mandalId?._id
+                });
+            });
+        });
+
+        // Sort combined activity by date DESC
+        const sortedActivity = activityList
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .slice(0, 10); // Last 10 activities
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                activeMandals: activeMandalIds.size,
+                totalPending: pendingAmount,
+                dueMandals: dueMandalsCount,
+                recentActivity: sortedActivity
+            }
+        });
+
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message || "Internal server error" });
+    }
+};
+
 export const deleteBooking = async (req, res) => {
     try {
         // ── Role guard: only owners may delete a booking ───────────────────────
