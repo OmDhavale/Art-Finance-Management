@@ -53,8 +53,8 @@ const userSchema = new Schema(
     role: {
       type: String,
       enum: {
-        values: ["owner", "manager", "admin"],
-        message: "Role must be one of: owner, manager, admin",
+        values: ["owner", "manager", "admin", "sketch-artist"],
+        message: "Role must be one of: owner, manager, admin, sketch-artist",
       },
       default: "owner",
     },

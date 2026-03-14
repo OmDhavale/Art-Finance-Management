@@ -8,6 +8,7 @@ import authRoutes from "./routes/auth.routes.js";
 import mandalRoutes from "./routes/mandal.routes.js";
 import bookingRoutes from "./routes/booking.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import artistRoutes from "./routes/artist.routes.js";
 
 // ─── Load Environment Variables ───────────────────────────────────────────────
 dotenv.config();
@@ -40,6 +41,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/mandals", mandalRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/artists", artistRoutes);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 app.use((req, res) => {

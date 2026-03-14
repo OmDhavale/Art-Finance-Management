@@ -154,3 +154,75 @@ export const login = async (req, res) => {
         });
     }
 };
+
+// ─── Register Sketch Artist ─────────────────────────────────────────────────────
+
+/**
+ * POST /api/auth/register/artist
+ *
+ * Business Logic:
+ *  - Phone must be unique across all users.
+ *  - Password is hashed with bcrypt before saving.
+ *  - New artist registrations get role = "sketch-artist".
+ *  - Artist has the same fields as Murtikar (name, workshopName, phone, password, location).
+ *  - Returns JWT token + user object (without password).
+ */
+export const registerArtist = async (req, res) => {
+    try {
+        const { name, workshopName, phone, password, area, city } = req.body;
+
+        // Validate required fields
+        if (!name || !workshopName || !phone || !password) {
+            return res.status(400).json({
+                success: false,
+                message: "name, workshopName, phone, and password are required.",
+            });
+        }
+
+        // Check for duplicate phone
+        const existing = await User.findOne({ phone });
+        if (existing) {
+            return res.status(409).json({
+                success: false,
+                message: "A user with this phone number is already registered.",
+            });
+        }
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+        // Create sketch-artist user
+        const user = await User.create({
+            name,
+            workshopName,
+            phone,
+            password: hashedPassword,
+            role: "sketch-artist",
+            location: { area, city },
+        });
+
+        const token = generateToken(user);
+
+        // Strip password from response
+        const userObj = user.toObject();
+        delete userObj.password;
+
+        return res.status(201).json({
+            success: true,
+            token,
+            user: userObj,
+        });
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                message: "A user with this phone number is already registered.",
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Internal server error",
+        });
+    }
+};

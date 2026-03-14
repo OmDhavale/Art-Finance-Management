@@ -399,7 +399,7 @@ export const closeBooking = async (req, res) => {
 export const getMyBookings = async (req, res) => {
     try {
         // Determine the workshop owner ID
-        const vendorId = req.user.role === 'owner' ? req.user._id : req.user.ownerId;
+        const vendorId = (req.user.role === 'owner' || req.user.role === 'sketch-artist') ? req.user._id : req.user.ownerId;
 
         if (!vendorId) {
             return res.status(401).json({ success: false, message: "Unauthorized. Workshop owner not found." });
@@ -442,7 +442,7 @@ export const getMyBookings = async (req, res) => {
  */
 export const getDashboardStats = async (req, res) => {
     try {
-        const vendorId = req.user.role === 'owner' ? req.user._id : req.user.ownerId;
+        const vendorId = (req.user.role === 'owner' || req.user.role === 'sketch-artist') ? req.user._id : req.user.ownerId;
         if (!vendorId) {
             return res.status(401).json({ success: false, message: "Workshop owner not found." });
         }
