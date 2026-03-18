@@ -113,6 +113,24 @@ export const searchMandals = async (req, res) => {
                 const overallGrade = hasBookingMap[key]
                     ? calculateOverallGrade(pendingMap[key] || 0)
                     : null;
+                
+                // If FREE user, redact sensitive data but KEEP years for banners and overallGrade for glimpse
+                if (req.user.plan === 'FREE') {
+                    const restrictedSummary = (hasBookingMap[key] ? allBookings.filter(b => b.mandalId.toString() === key) : [])
+                        .map(b => ({ year: b.year, isBooked: true }));
+
+                    return {
+                        _id: m._id,
+                        ganpatiTitle: m.ganpatiTitle,
+                        mandalName: m.mandalName,
+                        area: m.area,
+                        city: m.city,
+                        isRestricted: true,
+                        overallGrade,
+                        bookingSummary: restrictedSummary
+                    };
+                }
+
                 return { ...m, overallGrade };
             });
         }
@@ -164,6 +182,31 @@ export const getMandalDetails = async (req, res) => {
         const overallGrade = bookings.length > 0
             ? calculateOverallGrade(netPending)
             : null;
+
+        // If FREE plan, restrict history: only show their own bookings
+        if (req.user.plan === 'FREE') {
+            const vendorId = (req.user.role === 'owner' ? req.user._id : req.user.ownerId).toString();
+            
+            const filteredBookings = bookings.filter(b => 
+                b.vendorId?._id.toString() === vendorId
+            );
+
+            const restrictedMandal = {
+                ...mandal.toObject(),
+                overallGrade, // Include for glimpse logic
+                bookingSummary: bookings.map(b => ({ year: b.year, isBooked: true }))
+            };
+
+            return res.status(200).json({
+                success: true,
+                data: {
+                    mandal: restrictedMandal,
+                    bookingHistory: filteredBookings,
+                    isRestricted: true,
+                    message: "Upgrade to PRO to view full Mandal history"
+                },
+            });
+        }
 
         return res.status(200).json({
             success: true,
@@ -221,6 +264,29 @@ export const getAllMandals = async (req, res) => {
         const enriched = mandals.map((m) => {
             const bookings = bookingsByMandal[m._id.toString()] || [];
 
+            // Net pending = raw sum (can be negative for overpaid mandals)
+            const netPending = bookings.reduce(
+                (sum, b) => sum + (b.remainingAmount || 0),
+                0
+            );
+            const overallGrade = bookings.length > 0
+                ? calculateOverallGrade(netPending)
+                : null;
+
+            // If FREE user, return restricted data immediately
+            if (req?.user?.plan === 'FREE') {
+                return {
+                    _id: m._id,
+                    ganpatiTitle: m.ganpatiTitle,
+                    mandalName: m.mandalName,
+                    area: m.area,
+                    city: m.city,
+                    isRestricted: true,
+                    overallGrade,
+                    bookingSummary: bookings.map(b => ({ year: b.year, isBooked: true })),
+                };
+            }
+
             // Latest booking (already sorted by year desc)
             const latest = bookings[0] || null;
 
@@ -238,15 +304,6 @@ export const getAllMandals = async (req, res) => {
                 finalPrice: b.finalPrice || 0,
                 totalPaid: b.totalPaid || 0,
             }));
-
-            // Net pending = raw sum (can be negative for overpaid mandals)
-            const netPending = bookings.reduce(
-                (sum, b) => sum + (b.remainingAmount || 0),
-                0
-            );
-            const overallGrade = bookings.length > 0
-                ? calculateOverallGrade(netPending)
-                : null;
 
             return {
                 ...m,

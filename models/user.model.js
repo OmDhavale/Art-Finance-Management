@@ -79,6 +79,18 @@ const userSchema = new Schema(
       type: Boolean,
       default: true,
     },
+    plan: {
+      type: String,
+      enum: {
+        values: ["FREE", "PRO"],
+        message: "Plan must be one of: FREE, PRO",
+      },
+      default: "FREE",
+    },
+    planExpiresAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     collection: "users",

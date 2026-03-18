@@ -46,12 +46,25 @@ export const createBooking = async (req, res) => {
             advancePaid = 0,
         } = req.body;
 
-        // Consolidate data under the workshop owner
-        // If current user is a manager, the actual vendor is their owner
         const vendorId = req.user.role === 'manager' ? req.user.ownerId : req.user._id;
 
         if (!vendorId) {
             return res.status(400).json({ success: false, message: "Could not determine workshop owner." });
+        }
+
+        // ── Plan-based limit check (FREE users: 15/year) ─────────────────────
+        if (req.user.plan === 'FREE') {
+            const bookingCount = await Booking.countDocuments({
+                vendorId,
+                year: year || new Date().getFullYear(),
+            });
+
+            if (bookingCount >= 15) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Free plan limit reached. Upgrade to PRO for unlimited bookings.",
+                });
+            }
         }
 
 

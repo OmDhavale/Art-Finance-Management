@@ -5,7 +5,7 @@ import {
     getMandalDetails,
     getAllMandals,
 } from "../controllers/mandal.controller.js";
-import { verifyToken } from "../middleware/auth.middleware.js";
+import { verifyToken, checkProAccess } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
@@ -15,7 +15,7 @@ router.use(verifyToken);
 // POST   /api/mandals              → Create a new Mandal
 router.post("/", createMandal);
 
-// GET    /api/mandals              → Get ALL mandals with grades & pending amounts
+// GET    /api/mandals              → Get ALL mandals with grades & pending amounts (PRO ONLY)
 // NOTE: must be declared before /search and /:mandalId
 router.get("/", getAllMandals);
 

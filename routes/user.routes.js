@@ -4,6 +4,7 @@ import {
     getUserProfile,
     addManager,
     getWorkshopUsers,
+    updatePlan,
 } from "../controllers/user.controller.js";
 import { verifyToken } from "../middleware/auth.middleware.js";
 
@@ -20,7 +21,7 @@ router.post("/add-manager", verifyToken, addManager);
 // NOTE: declared before /:userId to avoid route conflict
 router.get("/workshop-users", verifyToken, getWorkshopUsers);
 
-// GET    /api/users/:userId            → Get any user's profile
-router.get("/:userId", getUserProfile);
+// POST   /api/users/update-plan       → Switch between FREE and PRO plans (protected)
+router.post("/update-plan", verifyToken, updatePlan);
 
 export default router;
