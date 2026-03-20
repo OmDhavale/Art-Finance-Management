@@ -4,21 +4,24 @@ import mongoose from "mongoose";
 // ─── Helper: Calculate Grade ──────────────────────────────────────────────────
 
 /**
- * calculateGrade(remainingAmount) → "excellent" | "green" | "yellow" | "orange" | "red"
+ * calculateGrade(remainingAmount, finalPrice) → "O" | "A" | "B" | "C" | "D"
  *
  * Grade logic:
- *   remainingAmount < 0         → excellent (overpaid — mandal gave extra)
- *   remainingAmount === 0       → green     (fully paid)
- *   remainingAmount < 10,000   → yellow    (almost done)
- *   remainingAmount < 50,000   → orange    (partially paid)
- *   remainingAmount >= 50,000  → red       (largely unpaid)
+ *   remainingAmount < 0         → O (Overpaid)
+ *   remainingAmount === 0       → A (Fully Paid)
+ *   Ratio (rem / final) <= 0.4  → B (1-40% Pending)
+ *   Ratio (rem / final) <= 0.8  → C (41-80% Pending)
+ *   Ratio (rem / final) > 0.8   → D (81%+ Pending)
  */
-export const calculateGrade = (remainingAmount) => {
-    if (remainingAmount < 0) return "excellent";
-    if (remainingAmount === 0) return "green";
-    if (remainingAmount < 10000) return "yellow";
-    if (remainingAmount < 50000) return "orange";
-    return "red";
+export const calculateGrade = (remainingAmount, finalPrice = 0) => {
+    if (remainingAmount < 0) return "O";
+    if (remainingAmount === 0) return "A";
+    if (!finalPrice || finalPrice <= 0) return "D"; // Avoid division by zero, default to D if no price
+
+    const ratio = remainingAmount / finalPrice;
+    if (ratio <= 0.4) return "B";
+    if (ratio <= 0.8) return "C";
+    return "D";
 };
 
 
@@ -79,7 +82,7 @@ export const createBooking = async (req, res) => {
 
         const totalPaid = advancePaid;
         const remainingAmount = (finalPrice || 0) - totalPaid;
-        const grade = calculateGrade(remainingAmount);
+        const grade = calculateGrade(remainingAmount, finalPrice);
 
         // Seed payments array with the advance payment (if any)
         const payments = [];
@@ -224,7 +227,7 @@ export const addPayment = async (req, res) => {
 
         // Recalculate remainingAmount and grade
         booking.remainingAmount = (booking.finalPrice || 0) - booking.totalPaid;
-        booking.grade = calculateGrade(booking.remainingAmount);
+        booking.grade = calculateGrade(booking.remainingAmount, booking.finalPrice);
 
         // Auto-complete and lock price when fully paid (remainingAmount <= 0)
         if (booking.remainingAmount <= 0) {
@@ -332,7 +335,7 @@ export const updateBookingPrice = async (req, res) => {
         // ── Apply price change ────────────────────────────────────────────────
         booking.finalPrice = finalPrice;
         booking.remainingAmount = finalPrice - (booking.totalPaid || 0);
-        booking.grade = calculateGrade(booking.remainingAmount);
+        booking.grade = calculateGrade(booking.remainingAmount, finalPrice);
 
         // ── Auto-lock if remaining is now 0 or less ───────────────────────────
         if (booking.remainingAmount <= 0) {

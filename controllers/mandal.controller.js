@@ -299,7 +299,7 @@ export const getAllMandals = async (req, res) => {
                 year: b.year,
                 vendorName: b.vendorId?.name || "Unknown",
                 workshopName: b.vendorId?.workshopName || "",
-                grade: calculateGrade(b.remainingAmount || 0),
+                grade: calculateGrade(b.remainingAmount || 0, b.finalPrice || 0),
                 remainingAmount: b.remainingAmount || 0,
                 finalPrice: b.finalPrice || 0,
                 totalPaid: b.totalPaid || 0,
@@ -307,7 +307,7 @@ export const getAllMandals = async (req, res) => {
 
             return {
                 ...m,
-                latestGrade: latest ? calculateGrade(latest.remainingAmount || 0) : null,
+                latestGrade: latest ? calculateGrade(latest.remainingAmount || 0, latest.finalPrice || 0) : null,
                 latestYear: latest?.year || null,
                 totalPending,
                 overallGrade,
