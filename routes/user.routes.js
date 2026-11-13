@@ -6,9 +6,13 @@ import {
     getWorkshopUsers,
     updatePlan,
 } from "../controllers/user.controller.js";
+import { getPublicMurtikarsStats } from "../controllers/portal.controller.js";
 import { verifyToken } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
+
+// GET    /api/users/public-murtikars   → Public endpoint for Mandal Portal directory & stats
+router.get("/public-murtikars", getPublicMurtikarsStats);
 
 // POST   /api/users                    → Create a Murtikar (backward-compat, no JWT returned)
 router.post("/", createUser);
