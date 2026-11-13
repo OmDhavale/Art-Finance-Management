@@ -13,8 +13,8 @@ import Mandal from "../models/mandal.model.js";
  * - Location (area, city)
  * - Workshop managers (name, phone, role)
  * - Actual year-wise number of bookings
- * - Client mandals served per year
- * - Murti sizes recorded in bookings
+ * - Client mandals served with their respective murti sizes (e.g. which mandal was made in which size)
+ * - Distinct murti sizes crafted
  * - Total bookings count
  *
  * STRICTLY EXCLUDES:
@@ -90,6 +90,7 @@ export const getPublicMurtikarsStats = async (req, res) => {
             vendorStat.totalBookings += 1;
 
             const year = b.year || (b.createdAt ? new Date(b.createdAt).getFullYear() : new Date().getFullYear());
+            const murtiSizeClean = (b.murtiSize || "").trim();
 
             if (!vendorStat.yearMap[year]) {
                 vendorStat.yearMap[year] = {
@@ -110,9 +111,9 @@ export const getPublicMurtikarsStats = async (req, res) => {
                 yearObj.activeBookings += 1;
             }
 
-            if (b.murtiSize && b.murtiSize.trim()) {
-                yearObj.murtiSizes.add(b.murtiSize.trim());
-                vendorStat.distinctSizes.add(b.murtiSize.trim());
+            if (murtiSizeClean) {
+                yearObj.murtiSizes.add(murtiSizeClean);
+                vendorStat.distinctSizes.add(murtiSizeClean);
             }
 
             if (b.mandalId && b.mandalId.ganpatiTitle) {
@@ -120,17 +121,24 @@ export const getPublicMurtikarsStats = async (req, res) => {
                 
                 if (!vendorStat.allMandalsMap.has(mandalKey)) {
                     vendorStat.allMandalsMap.set(mandalKey, {
+                        id: b.mandalId._id?.toString() || mandalKey,
                         ganpatiTitle: b.mandalId.ganpatiTitle,
                         mandalName: b.mandalId.mandalName || "",
                         area: b.mandalId.area || "",
                         city: b.mandalId.city || "",
                         years: [year],
+                        sizes: murtiSizeClean ? [murtiSizeClean] : [],
+                        history: [{ year, murtiSize: murtiSizeClean || "—" }],
                     });
                 } else {
                     const existing = vendorStat.allMandalsMap.get(mandalKey);
                     if (!existing.years.includes(year)) {
                         existing.years.push(year);
                     }
+                    if (murtiSizeClean && !existing.sizes.includes(murtiSizeClean)) {
+                        existing.sizes.push(murtiSizeClean);
+                    }
+                    existing.history.push({ year, murtiSize: murtiSizeClean || "—" });
                 }
 
                 yearObj.mandals.push({
@@ -138,7 +146,7 @@ export const getPublicMurtikarsStats = async (req, res) => {
                     mandalName: b.mandalId.mandalName || "",
                     area: b.mandalId.area || "",
                     city: b.mandalId.city || "",
-                    murtiSize: b.murtiSize || "",
+                    murtiSize: murtiSizeClean || "—",
                 });
             }
         });
@@ -163,15 +171,22 @@ export const getPublicMurtikarsStats = async (req, res) => {
                       .sort((a, b) => b.year - a.year)
                 : [];
 
-            // All distinct Mandals who ever booked with this Murtikar
+            // All distinct Mandals who ever booked with this Murtikar, with their specific murti sizes
             const pastMandals = vendorBookings
-                ? Array.from(vendorBookings.allMandalsMap.values()).map((pm) => ({
-                      ganpatiTitle: pm.ganpatiTitle,
-                      mandalName: pm.mandalName,
-                      area: pm.area,
-                      city: pm.city,
-                      years: pm.years.sort((a, b) => b - a),
-                  }))
+                ? Array.from(vendorBookings.allMandalsMap.values()).map((pm) => {
+                      const latestSize = pm.sizes.length > 0 ? pm.sizes[pm.sizes.length - 1] : "—";
+                      return {
+                          id: pm.id,
+                          ganpatiTitle: pm.ganpatiTitle,
+                          mandalName: pm.mandalName,
+                          area: pm.area,
+                          city: pm.city,
+                          years: pm.years.sort((a, b) => b - a),
+                          sizes: pm.sizes,
+                          murtiSize: latestSize,
+                          history: pm.history.sort((a, b) => b.year - a.year),
+                      };
+                  })
                 : [];
 
             const murtiSizes = vendorBookings
