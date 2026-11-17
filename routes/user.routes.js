@@ -4,10 +4,15 @@ import {
     getUserProfile,
     addManager,
     getWorkshopUsers,
+    updatePlan,
 } from "../controllers/user.controller.js";
+import { getPublicMurtikarsStats } from "../controllers/portal.controller.js";
 import { verifyToken } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
+
+// GET    /api/users/public-murtikars   → Public endpoint for Mandal Portal directory & stats
+router.get("/public-murtikars", getPublicMurtikarsStats);
 
 // POST   /api/users                    → Create a Murtikar (backward-compat, no JWT returned)
 router.post("/", createUser);
@@ -20,7 +25,7 @@ router.post("/add-manager", verifyToken, addManager);
 // NOTE: declared before /:userId to avoid route conflict
 router.get("/workshop-users", verifyToken, getWorkshopUsers);
 
-// GET    /api/users/:userId            → Get any user's profile
-router.get("/:userId", getUserProfile);
+// POST   /api/users/update-plan       → Switch between FREE and PRO plans (protected)
+router.post("/update-plan", verifyToken, updatePlan);
 
 export default router;

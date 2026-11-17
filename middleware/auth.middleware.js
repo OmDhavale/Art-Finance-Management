@@ -34,6 +34,12 @@ export const verifyToken = async (req, res, next) => {
             });
         }
 
+        // Automatic plan expiry check
+        if (user.plan === 'PRO' && user.planExpiresAt && new Date() > user.planExpiresAt) {
+            user.plan = 'FREE';
+            await user.save();
+        }
+
         req.user = user;
         next();
     } catch (error) {
@@ -49,4 +55,19 @@ export const verifyToken = async (req, res, next) => {
             message: "Invalid token.",
         });
     }
+};
+
+/**
+ * PRO ACCESS MIDDLEWARE
+ *
+ * Restricts access to PRO-only features.
+ */
+export const checkProAccess = (req, res, next) => {
+    if (req.user.plan !== 'PRO') {
+        return res.status(403).json({
+            success: false,
+            message: "Upgrade to PRO to access this feature.",
+        });
+    }
+    next();
 };

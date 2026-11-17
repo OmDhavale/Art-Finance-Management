@@ -121,19 +121,20 @@ const bookingSchema = new Schema(
             default: "active",
         },
         /**
-         * Grade reflects how much of the payment is still remaining.
+         * Grade reflects how much of the payment is still remaining (percentage-based).
          * Computed and stored by the controller when payments are updated.
          *
-         * green  → remainingAmount === 0
-         * yellow → remainingAmount < 10,000
-         * orange → remainingAmount < 50,000
-         * red    → remainingAmount >= 50,000
+         * O → Overpaid (remainingAmount < 0)
+         * A → Fully Paid (0% pending)
+         * B → 1-40% Pending
+         * C → 41-80% Pending
+         * D → 81%+ Pending
          */
         grade: {
             type: String,
             enum: {
-                values: ["excellent", "green", "yellow", "orange", "red"],
-                message: "Grade must be one of: excellent, green, yellow, orange, red",
+                values: ["O", "A", "B", "C", "D"],
+                message: "Grade must be one of: O, A, B, C, D",
             },
         },
         /** When true, no further price edits are permitted (set after full payment). */
