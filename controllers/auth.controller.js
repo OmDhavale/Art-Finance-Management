@@ -19,6 +19,19 @@ const generateToken = (user) => {
     );
 };
 
+const applyExpiredPlan = async (user) => {
+    // The former demo endpoint allowed client-controlled PRO activation.
+    // After billing rollout, only Google Play-verified entitlements are valid.
+    if (user.plan === "PRO" && user.billing?.provider !== "google_play") {
+        user.plan = "FREE";
+        user.planExpiresAt = null;
+        await user.save();
+    } else if (user.plan === "PRO" && user.planExpiresAt && new Date() >= user.planExpiresAt) {
+        user.plan = "FREE";
+        if (user.billing) user.billing.status = "EXPIRED";
+        await user.save();
+    }
+};
 // ─── Register Murtikar (Self Registration) ────────────────────────────────────
 
 /**
@@ -135,7 +148,7 @@ export const login = async (req, res) => {
                 message: "Invalid phone number or password.",
             });
         }
-
+        await applyExpiredPlan(user);
         const token = generateToken(user);
 
         // Strip password from response
