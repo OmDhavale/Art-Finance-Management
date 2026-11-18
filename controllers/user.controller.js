@@ -224,44 +224,44 @@ export const getWorkshopUsers = async (req, res) => {
  * POST /api/users/update-plan
  * Simulated endpoint to switch between FREE and PRO plans.
  */
-export const updatePlan = async (req, res) => {
-    try {
-        const userId = req.user._id;
-        const { plan } = req.body;
+// export const updatePlan = async (req, res) => {
+//     try {
+//         const userId = req.user._id;
+//         const { plan } = req.body;
 
-        if (!['FREE', 'PRO'].includes(plan)) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid plan type. Use 'FREE' or 'PRO'.",
-            });
-        }
+//         if (!['FREE', 'PRO'].includes(plan)) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Invalid plan type. Use 'FREE' or 'PRO'.",
+//             });
+//         }
 
-        let updateData = { plan };
+//         let updateData = { plan };
 
-        if (plan === "PRO") {
-            const expiresAt = new Date();
-            expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-            updateData.planExpiresAt = expiresAt;
-        } else {
-            updateData.planExpiresAt = null;
-        }
+//         if (plan === "PRO") {
+//             const expiresAt = new Date();
+//             expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+//             updateData.planExpiresAt = expiresAt;
+//         } else {
+//             updateData.planExpiresAt = null;
+//         }
 
-        const user = await User.findByIdAndUpdate(
-            userId,
-            updateData,
-            { new: true }
-        ).select("-password");
+//         const user = await User.findByIdAndUpdate(
+//             userId,
+//             updateData,
+//             { new: true }
+//         ).select("-password");
 
-        return res.status(200).json({
-            success: true,
-            message: `Successfully switched to ${plan} plan.`,
-            data: user,
-        });
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: error.message || "Internal server error",
-        });
-    }
-};
+//         return res.status(200).json({
+//             success: true,
+//             message: `Successfully switched to ${plan} plan.`,
+//             data: user,
+//         });
+//     } catch (error) {
+//         return res.status(500).json({
+//             success: false,
+//             message: error.message || "Internal server error",
+//         });
+//     }
+// };
 

@@ -34,9 +34,20 @@ export const verifyToken = async (req, res, next) => {
             });
         }
 
-        // Automatic plan expiry check
-        if (user.plan === 'PRO' && user.planExpiresAt && new Date() > user.planExpiresAt) {
+        // // Automatic plan expiry check
+        // if (user.plan === 'PRO' && user.planExpiresAt && new Date() > user.planExpiresAt) {
+        //     user.plan = 'FREE';
+        //     await user.save();
+        // }
+        // Remove legacy/demo PRO flags that were set by the old client-controlled endpoint.
+        // Only a Google Play-verified entitlement may grant PRO after this migration.
+        if (user.plan === 'PRO' && user.billing?.provider !== 'google_play') {
             user.plan = 'FREE';
+            user.planExpiresAt = null;
+            await user.save();
+        } else if (user.plan === 'PRO' && user.planExpiresAt && new Date() >= user.planExpiresAt) {
+            user.plan = 'FREE';
+            if (user.billing) user.billing.status = 'EXPIRED';
             await user.save();
         }
 

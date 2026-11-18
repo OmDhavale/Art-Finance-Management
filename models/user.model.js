@@ -91,6 +91,18 @@ const userSchema = new Schema(
       type: Date,
       default: null,
     },
+    // Google Play subscription entitlement. This is written only after
+    // server-side verification against the Google Play Developer API.
+    billing: {
+      provider: { type: String, enum: ["google_play", null], default: null },
+      productId: { type: String, default: null },
+      purchaseToken: { type: String, default: null, select: false },
+      orderId: { type: String, default: null },
+      status: { type: String, default: "none" },
+      expiresAt: { type: Date, default: null },
+      autoRenewing: { type: Boolean, default: false },
+      lastVerifiedAt: { type: Date, default: null },
+    },
   },
   {
     collection: "users",

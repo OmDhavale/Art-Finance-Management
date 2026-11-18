@@ -26,6 +26,6 @@ router.post("/add-manager", verifyToken, addManager);
 router.get("/workshop-users", verifyToken, getWorkshopUsers);
 
 // POST   /api/users/update-plan       → Switch between FREE and PRO plans (protected)
-router.post("/update-plan", verifyToken, updatePlan);
+//router.post("/update-plan", verifyToken, updatePlan);
 
 export default router;

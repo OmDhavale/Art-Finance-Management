@@ -9,6 +9,7 @@ import mandalRoutes from "./routes/mandal.routes.js";
 import bookingRoutes from "./routes/booking.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import portalRoutes from "./routes/portal.routes.js";
+import billingRoutes from "./routes/billing.routes.js";
 
 // ─── Load Environment Variables ───────────────────────────────────────────────
 dotenv.config();
@@ -42,6 +43,7 @@ app.use("/api/mandals", mandalRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/portal", portalRoutes);
+app.use("/api/billing", billingRoutes);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 app.use((req, res) => {
