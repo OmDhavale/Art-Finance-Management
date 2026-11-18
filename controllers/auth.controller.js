@@ -32,7 +32,6 @@ const applyExpiredPlan = async (user) => {
         await user.save();
     }
 };
-
 // ─── Register Murtikar (Self Registration) ────────────────────────────────────
 
 /**
@@ -150,7 +149,6 @@ export const login = async (req, res) => {
                 message: "Invalid phone number or password.",
             });
         }
-
         await applyExpiredPlan(user);
         const token = generateToken(user);
 
