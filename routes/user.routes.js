@@ -4,7 +4,7 @@ import {
     getUserProfile,
     addManager,
     getWorkshopUsers,
-    updatePlan,
+    // updatePlan,
 } from "../controllers/user.controller.js";
 import { getPublicMurtikarsStats } from "../controllers/portal.controller.js";
 import { verifyToken } from "../middleware/auth.middleware.js";
