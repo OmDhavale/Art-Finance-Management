@@ -91,13 +91,14 @@ const userSchema = new Schema(
       type: Date,
       default: null,
     },
-    // Google Play subscription entitlement. This is written only after
-    // server-side verification against the Google Play Developer API.
+    // Subscription entitlement (Google Play or Razorpay). Written only after
+    // server-side cryptographic/API verification.
     billing: {
-      provider: { type: String, enum: ["google_play", null], default: null },
+      provider: { type: String, enum: ["google_play", "razorpay", null], default: null },
       productId: { type: String, default: null },
       purchaseToken: { type: String, default: null, select: false },
       orderId: { type: String, default: null },
+      paymentId: { type: String, default: null },
       status: { type: String, default: "none" },
       expiresAt: { type: Date, default: null },
       autoRenewing: { type: Boolean, default: false },

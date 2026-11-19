@@ -39,9 +39,9 @@ export const verifyToken = async (req, res, next) => {
         //     user.plan = 'FREE';
         //     await user.save();
         // }
-        // Remove legacy/demo PRO flags that were set by the old client-controlled endpoint.
-        // Only a Google Play-verified entitlement may grant PRO after this migration.
-        if (user.plan === 'PRO' && user.billing?.provider !== 'google_play') {
+        // Remove legacy/demo PRO flags that were set by old client-controlled endpoints.
+        // A valid entitlement must originate from an authenticated provider (Google Play or Razorpay).
+        if (user.plan === 'PRO' && !['google_play', 'razorpay'].includes(user.billing?.provider)) {
             user.plan = 'FREE';
             user.planExpiresAt = null;
             await user.save();
