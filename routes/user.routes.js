@@ -4,6 +4,8 @@ import {
     getUserProfile,
     addManager,
     getWorkshopUsers,
+    requestAccountDeletion,
+    cancelAccountDeletion,
     // updatePlan,
 } from "../controllers/user.controller.js";
 import { getPublicMurtikarsStats } from "../controllers/portal.controller.js";
@@ -24,6 +26,12 @@ router.post("/add-manager", verifyToken, addManager);
 // GET    /api/users/workshop-users     → Get owner + all managers (protected)
 // NOTE: declared before /:userId to avoid route conflict
 router.get("/workshop-users", verifyToken, getWorkshopUsers);
+
+// POST   /api/users/request-account-deletion → Owner requests soft-delete (7-day grace period)
+router.post("/request-account-deletion", verifyToken, requestAccountDeletion);
+
+// POST   /api/users/cancel-account-deletion → Owner cancels pending deletion
+router.post("/cancel-account-deletion", verifyToken, cancelAccountDeletion);
 
 // POST   /api/users/update-plan       → Switch between FREE and PRO plans (protected)
 //router.post("/update-plan", verifyToken, updatePlan);

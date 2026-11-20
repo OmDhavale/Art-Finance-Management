@@ -1,5 +1,7 @@
 import bcrypt from "bcrypt";
 import User from "../models/user.model.js";
+import Mandal from "../models/mandal.model.js";
+import Booking from "../models/booking.model.js";
 
 const SALT_ROUNDS = 10;
 
@@ -264,4 +266,175 @@ export const getWorkshopUsers = async (req, res) => {
 //         });
 //     }
 // };
+
+// ─── Request Account Deletion (Owner Only, 7-day Grace Period) ────────────────
+
+/**
+ * POST /api/users/request-account-deletion
+ * Protected — only owners can request account deletion.
+ *
+ * Business Logic:
+ *  - Requires password confirmation for security.
+ *  - Sets deletionRequestedAt = now, deletionScheduledFor = now + 7 days.
+ *  - Managers cannot request deletion.
+ *  - If a deletion is already pending, returns a 409 conflict.
+ *  - During the 7-day grace period the account remains fully functional.
+ */
+export const requestAccountDeletion = async (req, res) => {
+    try {
+        if (req.user.role !== "owner") {
+            return res.status(403).json({
+                success: false,
+                message: "Only workshop owners can request account deletion.",
+            });
+        }
+
+        const { password } = req.body;
+
+        if (!password) {
+            return res.status(400).json({
+                success: false,
+                message: "Password is required to confirm account deletion.",
+            });
+        }
+
+        // Fetch user with password for verification
+        const user = await User.findById(req.user._id).select("+password");
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found.",
+            });
+        }
+
+        // Check if deletion is already requested
+        if (user.deletionRequestedAt) {
+            return res.status(409).json({
+                success: false,
+                message: "Account deletion is already scheduled.",
+                data: {
+                    deletionRequestedAt: user.deletionRequestedAt,
+                    deletionScheduledFor: user.deletionScheduledFor,
+                },
+            });
+        }
+
+        // Verify password
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({
+                success: false,
+                message: "Incorrect password.",
+            });
+        }
+
+        // Schedule deletion 7 days from now
+        const now = new Date();
+        const scheduledFor = new Date(now);
+        scheduledFor.setDate(scheduledFor.getDate() + 7);
+
+        user.deletionRequestedAt = now;
+        user.deletionScheduledFor = scheduledFor;
+        await user.save();
+
+        const userObj = user.toObject();
+        delete userObj.password;
+
+        return res.status(200).json({
+            success: true,
+            message: "Account deletion requested. Your account will be permanently deleted after 7 days. You can cancel this anytime before then.",
+            data: {
+                deletionRequestedAt: user.deletionRequestedAt,
+                deletionScheduledFor: user.deletionScheduledFor,
+            },
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Internal server error",
+        });
+    }
+};
+
+// ─── Cancel Account Deletion ──────────────────────────────────────────────────
+
+/**
+ * POST /api/users/cancel-account-deletion
+ * Protected — only the owner who requested deletion can cancel it.
+ *
+ * Business Logic:
+ *  - Clears deletionRequestedAt and deletionScheduledFor.
+ *  - Account returns to normal state immediately.
+ */
+export const cancelAccountDeletion = async (req, res) => {
+    try {
+        if (req.user.role !== "owner") {
+            return res.status(403).json({
+                success: false,
+                message: "Only workshop owners can cancel account deletion.",
+            });
+        }
+
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found.",
+            });
+        }
+
+        if (!user.deletionRequestedAt) {
+            return res.status(400).json({
+                success: false,
+                message: "No pending account deletion request to cancel.",
+            });
+        }
+
+        user.deletionRequestedAt = null;
+        user.deletionScheduledFor = null;
+        await user.save();
+
+        const userObj = user.toObject();
+        delete userObj.password;
+
+        return res.status(200).json({
+            success: true,
+            message: "Account deletion cancelled. Your account is fully restored.",
+            data: userObj,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Internal server error",
+        });
+    }
+};
+
+// ─── Hard-Delete Account (called by middleware after grace period) ─────────────
+
+/**
+ * performHardDelete(userId)
+ * Internal helper — permanently removes the owner, their managers,
+ * and all associated mandals and bookings from the database.
+ */
+export const performHardDelete = async (userId) => {
+    // Find all managers under this owner
+    const managers = await User.find({ ownerId: userId, role: "manager" });
+    const managerIds = managers.map((m) => m._id);
+
+    // All user IDs to clean up (owner + managers)
+    const allUserIds = [userId, ...managerIds];
+
+    // Delete all bookings created by any of these users
+    await Booking.deleteMany({ vendorId: { $in: allUserIds } });
+
+    // Delete all mandals created by any of these users
+    await Mandal.deleteMany({ createdBy: { $in: allUserIds } });
+
+    // Delete all manager accounts
+    await User.deleteMany({ ownerId: userId, role: "manager" });
+
+    // Delete the owner account
+    await User.findByIdAndDelete(userId);
+};
 

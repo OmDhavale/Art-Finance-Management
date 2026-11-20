@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
+import { performHardDelete } from "../controllers/user.controller.js";
 
 /**
  * VERIFY TOKEN MIDDLEWARE
@@ -49,6 +50,21 @@ export const verifyToken = async (req, res, next) => {
             user.plan = 'FREE';
             if (user.billing) user.billing.status = 'EXPIRED';
             await user.save();
+        }
+
+        // ── Account Deletion Grace Period Check ──
+        // If the owner requested deletion and the 7-day window has elapsed,
+        // perform the hard-delete now (lazy cleanup — no cron needed).
+        if (user.deletionScheduledFor && new Date() >= user.deletionScheduledFor) {
+            try {
+                await performHardDelete(user._id);
+            } catch (deleteErr) {
+                console.error("Hard-delete failed:", deleteErr);
+            }
+            return res.status(401).json({
+                success: false,
+                message: "Your account has been permanently deleted as per your deletion request.",
+            });
         }
 
         req.user = user;

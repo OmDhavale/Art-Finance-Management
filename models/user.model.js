@@ -91,6 +91,18 @@ const userSchema = new Schema(
       type: Date,
       default: null,
     },
+    /**
+     * Soft-delete fields for account deletion with 7-day grace period.
+     * Only populated when an owner requests account deletion.
+     */
+    deletionRequestedAt: {
+      type: Date,
+      default: null,
+    },
+    deletionScheduledFor: {
+      type: Date,
+      default: null,
+    },
     // Subscription entitlement (Google Play or Razorpay). Written only after
     // server-side cryptographic/API verification.
     billing: {

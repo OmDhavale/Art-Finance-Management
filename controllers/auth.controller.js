@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
+import { performHardDelete } from "./user.controller.js";
 
 const SALT_ROUNDS = 10;
 
@@ -139,6 +140,45 @@ export const login = async (req, res) => {
                 success: false,
                 message: "Your account has been deactivated. Contact the owner.",
             });
+        }
+
+        // ── Account Deletion Grace Period Check on Login ──
+        // If the owner requested deletion and the 7-day window has elapsed,
+        // perform the hard-delete and block login.
+        if (user.deletionScheduledFor && new Date() >= user.deletionScheduledFor) {
+            try {
+                await performHardDelete(user._id);
+            } catch (deleteErr) {
+                console.error("Hard-delete on login failed:", deleteErr);
+            }
+            return res.status(401).json({
+                success: false,
+                message: "Your account has been permanently deleted as per your deletion request.",
+            });
+        }
+
+        // If this is a manager, check if the owner's account has been deleted
+        if (user.role === "manager" && user.ownerId) {
+            const owner = await User.findById(user.ownerId);
+            if (!owner) {
+                // Owner was already deleted — delete this orphan manager too
+                await User.findByIdAndDelete(user._id);
+                return res.status(401).json({
+                    success: false,
+                    message: "The workshop owner's account has been deleted. This manager account is no longer valid.",
+                });
+            }
+            if (owner.deletionScheduledFor && new Date() >= owner.deletionScheduledFor) {
+                try {
+                    await performHardDelete(owner._id);
+                } catch (deleteErr) {
+                    console.error("Hard-delete on manager login failed:", deleteErr);
+                }
+                return res.status(401).json({
+                    success: false,
+                    message: "The workshop owner's account has been permanently deleted. This manager account is no longer valid.",
+                });
+            }
         }
 
         // Compare passwords
